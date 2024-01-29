@@ -9,6 +9,7 @@ import {
 import {ContactImpl, ContactInterface, RoomImpl, RoomInterface} from "wechaty/impls";
 import qrcodeTerminal from 'qrcode-terminal'
 import {getGPTMessage} from './openai-service'
+import DBUtils from "./data";
 
 enum MessageType {
   Unknown = 0,
@@ -44,10 +45,10 @@ export class ChatGPTBot {
 
     // 打印接收的消息
     if (privateChat) {
-      console.log(`🤵 Contact: ${talker.name()} 💬 Text: ${rawText}`)
+      console.log(`🤵 Contact: ${talker.name()} : Text: ${rawText}`)
     } else {
       const topic = await room.topic()
-      console.log(`🚪 Room: ${topic} 🤵 Contact: ${talker.name()} 💬 Text: ${rawText}`)
+      console.log(`🚪 Room: ${topic} 🤵 Contact: ${talker.name()} : Text: ${rawText}`)
     }
 
     // 过滤不需要回复的消息
@@ -119,8 +120,12 @@ export class ChatGPTBot {
 
   // 私人消息发送gpt
   async onPrivateMessage(talker: ContactInterface, text: string) {
-    const gptMessage = await getGPTMessage(talker.name(),text);
-    await this.trySay(talker, gptMessage);
+    if (DBUtils.contains(text)){
+      await this.trySay(talker, DBUtils.get(text));
+    } else {
+      const gptMessage = await getGPTMessage(talker.name(),text);
+      await this.trySay(talker, gptMessage);
+    }
   }
 
   // 群组消息发送gpt
@@ -154,44 +159,53 @@ function onScan (qrcode: string, status: ScanStatus) {
   }
 }
 
-// 当用户登录机器人时，此函数将打印消息
-function onLogin (user: Contact) {
-  log.info('StarterBot', '%s login', user)
-}
-
-// 当用户注销时，这将打印消息
-function onLogout (user: Contact) {
-  log.info('StarterBot', '%s logout', user)
-}
-
-// 通过提供名称来初始化机器人
-const bot = WechatyBuilder.build({
-  name: 'ding-dong-bot',
-  puppetOptions: {
-    uos: true  // 开启uos协议
-  },
-  puppet: 'wechaty-puppet-wechat',
-})
-
-// 分配适当的函数以在事件触发时调用
-bot.on('scan',    onScan)
-bot.on('login',   onLogin)
-bot.on('logout',  onLogout)
-bot.on('message', async (message) => {
-    await chatGPTBot.onMessage(message)
+async function main() {
+  const initializedAt = Date.now()
+  // 当用户登录机器人时，此函数将打印消息
+  function onLogin (user: Contact) {
+    log.info('StarterBot', '%s login', user)
   }
-)
 
-// 启动机器人
-bot.start()
-  .then(() => log.info('StarterBot', 'Starter Bot Started.'))
-  .catch(e => log.error('StarterBot', e))
+  // 当用户注销时，这将打印消息
+  function onLogout (user: Contact) {
+    log.info('StarterBot', '%s logout', user)
+  }
 
-// 关闭时清理
-const finis = require('finis')
-finis(async (code:any, signal:any) => {
-  const exitMsg = `Wechaty exit ${code} because of ${signal} `
-  await bot.stop()
-  console.log(exitMsg)
-  process.exit(-1)
-})
+  // 通过提供名称来初始化机器人
+  const bot = WechatyBuilder.build({
+    name: 'ding-dong-bot',
+    puppetOptions: {
+      uos: true  // 开启uos协议
+    },
+    puppet: 'wechaty-puppet-wechat',
+  })
+
+  // 分配适当的函数以在事件触发时调用
+  bot.on('scan',    onScan)
+  bot.on('login',   onLogin)
+  bot.on('logout',  onLogout)
+  bot.on('message', async (message) => {
+      // 忽略过期时间的消息
+      if (message.date().getTime() < initializedAt) {
+        return;
+      }
+      await chatGPTBot.onMessage(message)
+    }
+  )
+
+  // 启动机器人
+  bot.start()
+    .then(() => log.info('StarterBot', 'Starter Bot Started.'))
+    .catch(e => log.error('StarterBot', e))
+
+  // 关闭时清理
+  const finis = require('finis')
+  finis(async (code:any, signal:any) => {
+    const exitMsg = `Wechaty exit ${code} because of ${signal} `
+    await bot.stop()
+    console.log(exitMsg)
+    process.exit(-1)
+  })
+}
+
+main();
