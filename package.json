@@ -12,6 +12,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "finis": "^0.4.5",
+    "https-proxy-agent": "^7.0.2",
+    "openai": "^4.24.1",
     "clone-class": "^1.0.3",
     "dotenv": "^16.4.1",
     "qrcode-terminal": "^0.12.0",
