@@ -8,7 +8,7 @@ import {
 }from 'wechaty'
 import {ContactImpl, ContactInterface, RoomImpl, RoomInterface} from "wechaty/impls";
 import qrcodeTerminal from 'qrcode-terminal'
-import {getGPTMessage} from './openai-service'
+import {getGPTMessageOnNode, getGPTMessageOnPython} from './openai-service'
 import DBUtils from "./data";
 
 enum MessageType {
@@ -123,7 +123,7 @@ export class ChatGPTBot {
     if (DBUtils.contains(text)){
       await this.trySay(talker, DBUtils.get(text));
     } else {
-      const gptMessage = await getGPTMessage(talker.name(),text);
+      const gptMessage = await getGPTMessageOnPython(text);
       await this.trySay(talker, gptMessage);
     }
   }
@@ -134,7 +134,7 @@ export class ChatGPTBot {
     text: string,
     room: RoomInterface
   ) {
-    const gptMessage = await getGPTMessage(await room.topic(), text);
+    const gptMessage = await getGPTMessageOnPython(text);
     const result = `@${talker.name()} ${text}\n\n------\n ${gptMessage}`;
     await this.trySay(room, result);
   }
